@@ -2,6 +2,13 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
           package="com.josfloy.magicmirror">
 
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/><!--写存储卡-->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/> <!--读存储卡-->
+    <uses-permission android:name="android.permission.CAMERA"/>             <!--访问照相设备权限-->
+    <uses-permission android:name="android.permission.RECORD_AUDIO"/>   <!--允许程序录制音频-->
+    <!--保持进程在休眠时从屏幕消失-->
+    <uses-permission android:name="android.permission.WAKE_LOCK"/>
+    <uses-feature android:name="android.hardware.camera"/>                <!--相机-->
     <application
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
@@ -16,7 +23,7 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
-        <activity android:name=".MainActivity">
+        <activity android:name=".activity.MainActivity">
         </activity>
     </application>
 

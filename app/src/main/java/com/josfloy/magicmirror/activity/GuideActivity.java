@@ -7,7 +7,6 @@ import android.os.Message;
 import android.support.v7.app.AppCompatActivity;
 import android.view.KeyEvent;
 
-import com.josfloy.magicmirror.MainActivity;
 import com.josfloy.magicmirror.R;
 
 public class GuideActivity extends AppCompatActivity {
