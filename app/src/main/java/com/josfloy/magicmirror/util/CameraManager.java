@@ -11,12 +11,12 @@ import android.view.Surface;
 import java.util.List;
 
 /**
- * Created by Jos on 2018/8/1 0001.
- * You can copy it anywhere you want
- */
-
-/**
  * 相机操作的相关工具类
+ * 想法：
+ * 一、做成工具类，所有成员都是静态方法 这样在创建Camera对象的时候不用创建CameraManager对象，而且
+ * 里面的所有成员函数都能独立出来 单独调用功能
+ * 二、让CameraManager对象包含Camera对象，所有函数都为Camera对象服务，好处是当我们需要更换为更新的
+ * Camera2 时只需要在这个类中改动，而不需要改动其他地方
  */
 public class CameraManager {
     //设置摄像头方向getCameraInfo需要一个摄像头ID
@@ -92,28 +92,28 @@ public class CameraManager {
     }
 
     /**
-     * 设置摄像头
+     * 设置摄像头并返回摄像头对象以便后期获取摄像头参数
      */
-    public static Camera setCamera(Activity mContext) {
+    public static Camera getCamera(Activity mContext) {
         if (checkCameraHardware(mContext)) {
             Camera camera = openFrontFacingCameraGingerbread();
-
             setCameraDisplayOrientation(mContext, mCurrentCamIndex, camera);
+
             Camera.Parameters parameters = camera.getParameters();
-            parameters.setPictureFormat(ImageFormat.JPEG);
 
             /* List<String> list = parameters.getSupportedFocusModes();
             for (String str : list) {
                 Log.e("CameraManager", "支持的对焦模式: " + str);
             }*/
-
             //手机支持的图片尺寸集合
             List<Camera.Size> pictureList = parameters.getSupportedPictureSizes();
             //手机支持的预览尺寸集合
             List<Camera.Size> previewList = parameters.getSupportedPreviewSizes();
+
             //设置为当前使用手机的最大尺寸
             parameters.setPictureSize(pictureList.get(0).width, pictureList.get(0).height);
             parameters.setPreviewSize(previewList.get(0).width, previewList.get(0).height);
+            parameters.setPictureFormat(ImageFormat.JPEG);
 
             camera.setParameters(parameters);
             return camera;
