@@ -5,6 +5,8 @@ import android.annotation.SuppressLint;
 import android.app.ProgressDialog;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.graphics.Color;
+import android.graphics.Paint;
 import android.hardware.Camera;
 import android.os.Bundle;
 import android.os.Handler;
@@ -14,6 +16,7 @@ import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
+import android.view.GestureDetector;
 import android.view.MotionEvent;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
@@ -28,10 +31,14 @@ import android.widget.Toast;
 import com.josfloy.magicmirror.R;
 import com.josfloy.magicmirror.utils.AudioRecordManager;
 import com.josfloy.magicmirror.utils.CameraManager;
+import com.josfloy.magicmirror.utils.MyBrokenCallback;
 import com.josfloy.magicmirror.utils.SetBrightness;
 import com.josfloy.magicmirror.view.DrawView;
 import com.josfloy.magicmirror.view.FunctionView;
 import com.josfloy.magicmirror.view.PictureView;
+import com.zys.brokenview.BrokenCallback;
+import com.zys.brokenview.BrokenTouchListener;
+import com.zys.brokenview.BrokenView;
 
 import java.io.IOException;
 
@@ -84,6 +91,30 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     private AudioRecordManager mAudioRecordManager;
     private static final int RECORD = 2;
 
+    //碎屏操作属性
+    private BrokenView mBrokenView;
+    private boolean isBroken;
+    private BrokenCallback mCallback;
+    private BrokenTouchListener mBrokenTouchListener;
+    private Paint brokenPaint;
+
+    private GestureDetector mGestureDetector;
+    private MySimpleGestureListener mySimpleGestureListener;    //手势自定义子类
+
+    class MySimpleGestureListener extends GestureDetector.SimpleOnGestureListener {
+        @SuppressLint("ClickableViewAccessibility")
+        @Override
+        public void onLongPress(MotionEvent e) {        //开启碎屏效果
+            super.onLongPress(e);
+            Log.e("手势", "长按");
+            isBroken = true;//碎屏
+            mBrokenView.setEnable(isBroken);            //碎屏控件可用
+            pictureView.setOnTouchListener(mBrokenTouchListener);//设置碎屏长按监听
+            hideView();                    //隐藏控件
+            mAudioRecordManager.isGetVoiceRun = false;        //设置话筒不启动
+        }
+    }
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -107,6 +138,10 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         //实例化话筒并开启录音
         mAudioRecordManager = new AudioRecordManager(mHandler, RECORD);
         mAudioRecordManager.getNoiseLevel();
+
+        //实现碎屏效果
+        mySimpleGestureListener = new MySimpleGestureListener();   //创建手势识别监听对象
+        mGestureDetector = new GestureDetector(this, mySimpleGestureListener);
     }
 
     @Override
@@ -176,6 +211,8 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
                 drawView.setVisibility(View.GONE);
             }
         });
+        //设置碎屏的相关属性
+        setToBrokenTheView();
     }
 
     private void initViews() {
@@ -333,7 +370,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     public boolean onTouch(View view, MotionEvent motionEvent) {
         switch (view.getId()) {
             case R.id.picture:
-                //待添加手势识别事件方法
+                mGestureDetector.onTouchEvent(motionEvent);
                 break;
             default:
                 break;
@@ -432,4 +469,21 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
             return false;
         }
     });
+
+    private void setToBrokenTheView() {
+        brokenPaint = new Paint();
+        brokenPaint.setStrokeWidth(5);
+        brokenPaint.setColor(Color.BLACK);
+        brokenPaint.setAntiAlias(true);
+        mBrokenView = BrokenView.add2Window(this);
+        mBrokenTouchListener = new BrokenTouchListener
+                .Builder(mBrokenView)
+                .setPaint(brokenPaint)
+                .setBreakDuration(2000)
+                .setFallDuration(5000)
+                .build();
+        mBrokenView.setEnable(true);
+        mCallback = new MyBrokenCallback();
+        mBrokenView.setCallback(mCallback);
+    }
 }
