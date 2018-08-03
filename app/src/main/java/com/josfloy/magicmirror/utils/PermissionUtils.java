@@ -1,4 +1,4 @@
-package com.josfloy.magicmirror.util;
+package com.josfloy.magicmirror.utils;
 
 import android.annotation.TargetApi;
 import android.app.Activity;

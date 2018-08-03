@@ -22,7 +22,8 @@ import android.widget.SeekBar;
 import android.widget.Toast;
 
 import com.josfloy.magicmirror.R;
-import com.josfloy.magicmirror.util.CameraManager;
+import com.josfloy.magicmirror.utils.CameraManager;
+import com.josfloy.magicmirror.utils.SetBrightness;
 import com.josfloy.magicmirror.view.DrawView;
 import com.josfloy.magicmirror.view.FunctionView;
 import com.josfloy.magicmirror.view.PictureView;
@@ -56,6 +57,11 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     private int[] frame_index_ID;
     private static final int PHOTO = 1;
 
+    //设置亮度相关属性
+    private int brightnessValue;
+    private boolean isAutoBrightness;
+    private int SegmentLength;     //把亮度分为8段，每段为256的1/8
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -72,6 +78,9 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
 
         //camera = CameraManager.getCamera(this);
         requestCameraPermission();
+
+        //设置屏幕亮度
+        getBrightnessFromWindow();
     }
 
     @Override
@@ -290,12 +299,12 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
 
     @Override
     public void down() {
-
+        downCurrentActivityBrightnessValues();
     }
 
     @Override
     public void up() {
-
+        upCurrentActivityBrightnessValues();
     }
 
     @Override
@@ -307,4 +316,48 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
             pictureView.setPhotoFrame(frame_index);
         }
     }
+
+    private void setMyActivityBright(int brightnessValue) {
+        SetBrightness.setScreenBrightness(this, brightnessValue);
+        SetBrightness.saveBrightness(SetBrightness.getResolver(this), brightnessValue);
+    }
+
+    private void getAfterMySetBrightnessValues() {
+        brightnessValue = SetBrightness.getScreenBrightness(this);    //获得亮度
+        Log.e(TAG, "当前手机屏幕亮度值:" + brightnessValue);
+    }
+
+    public void getBrightnessFromWindow() {
+        //获得是否自动调节亮度
+        isAutoBrightness = SetBrightness.isAutoBrightness(SetBrightness.getResolver(this));
+        Log.e(TAG, "当前手机是否是自动调节屏幕亮度: " + isAutoBrightness);
+
+        if (isAutoBrightness) {
+            SetBrightness.stopAutoBrightness(this);
+            Log.e(TAG, "关闭了自动调节");
+            setMyActivityBright(255 / 2 + 1);
+        }
+
+        //亮度值 0~256
+        SegmentLength = (255 / 2 + 1) / 4;
+        getAfterMySetBrightnessValues();
+    }
+
+    private void downCurrentActivityBrightnessValues() {
+        if (brightnessValue > 0) {
+            setMyActivityBright(brightnessValue - SegmentLength);  //减少亮度
+        }
+        getAfterMySetBrightnessValues();            //获取设置后的屏幕亮度
+    }
+
+    private void upCurrentActivityBrightnessValues() {
+        if (brightnessValue < 255) {
+            if (brightnessValue + SegmentLength >= 256) {        //最大值256
+                return;
+            }
+            setMyActivityBright(brightnessValue + SegmentLength);//调高亮度
+        }
+        getAfterMySetBrightnessValues();            //获取设置后的屏幕亮度
+    }
+
 }

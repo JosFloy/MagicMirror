@@ -1,4 +1,4 @@
-package com.josfloy.magicmirror.util;
+package com.josfloy.magicmirror.utils;
 
 import android.app.Activity;
 import android.content.Context;
