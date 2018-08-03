@@ -63,6 +63,13 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
 
         initViews();
         setViews();
+
+        //设置默认镜框ID数组
+        frame_index = 0;
+        frame_index_ID = new int[]{R.drawable.mag_0001, R.drawable.mag_0003, R.drawable.mag_0005,
+                R.drawable.mag_0006, R.drawable.mag_0007, R.drawable.mag_0008, R.drawable.mag_0009,
+                R.drawable.mag_0011, R.drawable.mag_0012, R.drawable.mag_0014};
+
         //camera = CameraManager.getCamera(this);
         requestCameraPermission();
     }
@@ -278,6 +285,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     public void choose() {
         Intent intent = new Intent(this, PhotoFrameActivity.class);
         startActivityForResult(intent, PHOTO);
+        Toast.makeText(this, "选择！", Toast.LENGTH_SHORT).show();
     }
 
     @Override
@@ -288,5 +296,15 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     @Override
     public void up() {
 
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        Log.e(TAG, "返回值： " + resultCode + "\t\t 请求值： " + requestCode);
+        if (resultCode == RESULT_OK && requestCode == PHOTO) {
+            frame_index = data.getIntExtra("POSITION", 0);
+            pictureView.setPhotoFrame(frame_index);
+        }
     }
 }
