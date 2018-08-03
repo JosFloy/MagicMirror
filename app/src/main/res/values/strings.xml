@@ -1,4 +1,5 @@
 <resources>
     <string name="app_name">MagicMirror</string>
     <string name="back_txt">返回</string>
+    <string name="frame_gallery_item">提供相框</string>
 </resources>

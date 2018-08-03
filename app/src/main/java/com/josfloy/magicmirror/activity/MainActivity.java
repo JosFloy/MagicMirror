@@ -1,7 +1,9 @@
 package com.josfloy.magicmirror.activity;
 
 import android.Manifest;
+import android.annotation.SuppressLint;
 import android.app.ProgressDialog;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.hardware.Camera;
 import android.os.Bundle;
@@ -10,8 +12,10 @@ import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
+import android.view.MotionEvent;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
+import android.view.View;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.SeekBar;
@@ -25,7 +29,9 @@ import com.josfloy.magicmirror.view.PictureView;
 
 import java.io.IOException;
 
-public class MainActivity extends AppCompatActivity implements SurfaceHolder.Callback {
+public class MainActivity extends AppCompatActivity implements SurfaceHolder.Callback
+        , SeekBar.OnSeekBarChangeListener, View.OnTouchListener, View.OnClickListener,
+        FunctionView.onFunctionViewItemClickListener {
     private static final String TAG = MainActivity.class.getSimpleName(); //获得类名
     private SurfaceHolder holder;            //用于控制SurfaceView的显示内容
     private SurfaceView surfaceView;        //显示相机拍摄的内容
@@ -45,6 +51,11 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     private int everyFocus;            //用于调整焦距
     private int nowFocus;                //当前的焦距值
 
+    //镜框相关的属性
+    private int frame_index;
+    private int[] frame_index_ID;
+    private static final int PHOTO = 1;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -56,9 +67,20 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         requestCameraPermission();
     }
 
+    @Override
+    protected void onRestart() {
+        super.onRestart();
+        requestCameraPermission();
+    }
+
+    @SuppressLint("ClickableViewAccessibility")
     private void setViews() {
         holder = surfaceView.getHolder();
         holder.addCallback(this);
+        add.setOnTouchListener(this);
+        minus.setOnTouchListener(this);
+        seekBar.setOnSeekBarChangeListener(this);
+        functionView.setOnFunctionViewItemClickListener(this);
     }
 
     private void getCameraParams() {
@@ -176,9 +198,95 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         }
     }
 
+    private void setZoomValues(int want) {
+        Camera.Parameters parameters = camera.getParameters();
+        seekBar.setProgress(want);
+        parameters.setZoom(want);
+        camera.setParameters(parameters);
+    }
+
+    private int getZoomValues() {
+        Camera.Parameters parameters = camera.getParameters();
+        return parameters.getZoom();
+    }
+
+    private void addZoomValues() {
+        if (nowFocus > maxFocus) {        //当前焦距 大于 最大焦距
+            Log.e(TAG, "大于maxFocus是不可能的！");
+        } else if (nowFocus != maxFocus) {                //设置焦距，当前焦距 + 每一次变化的值
+            setZoomValues(getZoomValues() + everyFocus);
+        }
+    }
+
+    private void minusZoomValues() {
+        if (nowFocus < 0) {
+            Log.e(TAG, "小于0是不可能的！");
+        } else if (nowFocus != 0) {                //设置焦距，当前焦距 - 每一次变化的值
+            setZoomValues(getZoomValues() - everyFocus);
+        }
+    }
+
+    public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+        //0~99  99级
+        Camera.Parameters parameters = camera.getParameters();    //获取相机参数
+        nowFocus = progress;                    //进度值赋值给焦距
+        parameters.setZoom(progress);                //设置焦距
+        camera.setParameters(parameters);                //设置相机
+    }
+
     @Override
-    protected void onRestart() {
-        super.onRestart();
-        requestCameraPermission();
+    public void onStartTrackingTouch(SeekBar seekBar) {
+
+    }
+
+    @Override
+    public void onStopTrackingTouch(SeekBar seekBar) {
+
+    }
+
+
+    @Override
+    public void onClick(View view) {
+
+    }
+
+    @Override
+    public boolean onTouch(View view, MotionEvent motionEvent) {
+        switch (view.getId()) {
+            case R.id.add:
+                addZoomValues();
+                break;
+            case R.id.minus:
+                minusZoomValues();
+                break;
+            case R.id.picture:
+                //待添加手势识别事件方法
+                break;
+            default:
+                break;
+        }
+        return true;
+    }
+
+    @Override
+    public void hint() {
+        Intent intent = new Intent(this, HintActivity.class);
+        startActivity(intent);
+    }
+
+    @Override
+    public void choose() {
+        Intent intent = new Intent(this, PhotoFrameActivity.class);
+        startActivityForResult(intent, PHOTO);
+    }
+
+    @Override
+    public void down() {
+
+    }
+
+    @Override
+    public void up() {
+
     }
 }
