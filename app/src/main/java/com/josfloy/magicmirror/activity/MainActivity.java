@@ -7,6 +7,8 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.hardware.Camera;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Message;
 import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
@@ -16,12 +18,15 @@ import android.view.MotionEvent;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.View;
+import android.view.animation.Animation;
+import android.view.animation.AnimationUtils;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.SeekBar;
 import android.widget.Toast;
 
 import com.josfloy.magicmirror.R;
+import com.josfloy.magicmirror.utils.AudioRecordManager;
 import com.josfloy.magicmirror.utils.CameraManager;
 import com.josfloy.magicmirror.utils.SetBrightness;
 import com.josfloy.magicmirror.view.DrawView;
@@ -30,9 +35,22 @@ import com.josfloy.magicmirror.view.PictureView;
 
 import java.io.IOException;
 
+/**
+ * 声明： 原程序来来自于明日科技的Android项目开发实战入门
+ * 但 源程序写的太烂，在代码荣誉 设计 思路方面都存在各种冗余
+ * 改动如下：
+ * 一、添加 对权限的申请和验证
+ * 二、修改主类 主类挂载太多多余的接口不符合设计原则
+ * 三、增加各个功能类，不让单个类做过多的事情
+ * 四、对于应用内的各个组件的通信 重新修改，其中表现为对相框的选择
+ * 这些只是基础的东西，对系统的兼容性有很大的挑战
+ * 未来计划改动的部分：
+ * 增加框架的利用，重构代码 让其更能符合设计原则
+ * 增加新的功能
+ * 目前能用的框架也只有 注解和事件总线，还有就是对性能的分析
+ */
 public class MainActivity extends AppCompatActivity implements SurfaceHolder.Callback
-        , SeekBar.OnSeekBarChangeListener, View.OnTouchListener, View.OnClickListener,
-        FunctionView.onFunctionViewItemClickListener {
+        , View.OnTouchListener, View.OnClickListener {
     private static final String TAG = MainActivity.class.getSimpleName(); //获得类名
     private SurfaceHolder holder;            //用于控制SurfaceView的显示内容
     private SurfaceView surfaceView;        //显示相机拍摄的内容
@@ -62,6 +80,10 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     private boolean isAutoBrightness;
     private int SegmentLength;     //把亮度分为8段，每段为256的1/8
 
+    //起雾操作相关属性
+    private AudioRecordManager mAudioRecordManager;
+    private static final int RECORD = 2;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -70,7 +92,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         initViews();
         setViews();
 
-        //设置默认镜框ID数组
+        //设置默认镜框ID数组漕
         frame_index = 0;
         frame_index_ID = new int[]{R.drawable.mag_0001, R.drawable.mag_0003, R.drawable.mag_0005,
                 R.drawable.mag_0006, R.drawable.mag_0007, R.drawable.mag_0008, R.drawable.mag_0009,
@@ -81,6 +103,10 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
 
         //设置屏幕亮度
         getBrightnessFromWindow();
+
+        //实例化话筒并开启录音
+        mAudioRecordManager = new AudioRecordManager(mHandler, RECORD);
+        mAudioRecordManager.getNoiseLevel();
     }
 
     @Override
@@ -93,20 +119,63 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     private void setViews() {
         holder = surfaceView.getHolder();
         holder.addCallback(this);
-        add.setOnTouchListener(this);
-        minus.setOnTouchListener(this);
-        seekBar.setOnSeekBarChangeListener(this);
-        functionView.setOnFunctionViewItemClickListener(this);
-    }
 
-    private void getCameraParams() {
-        final Camera.Parameters parameters = camera.getParameters();
-        minFocus = parameters.getZoom();
-        maxFocus = parameters.getMaxZoom();
-        everyFocus = 1;
-        nowFocus = minFocus;
-        seekBar.setMax(maxFocus);
-        Log.e(TAG, "当前镜头距离： " + minFocus + "\t\t获得最大距离: " + maxFocus);
+        //为控件设置监听事件
+        add.setOnClickListener(this);
+        minus.setOnClickListener(this);
+        seekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                //0~99  99级
+                Camera.Parameters parameters = camera.getParameters();    //获取相机参数
+                nowFocus = progress;                    //进度值赋值给焦距
+                parameters.setZoom(progress);                //设置焦距
+                camera.setParameters(parameters);                //设置相机
+            }
+
+            @Override
+            public void onStartTrackingTouch(SeekBar seekBar) {
+
+            }
+
+            @Override
+            public void onStopTrackingTouch(SeekBar seekBar) {
+
+            }
+        });
+        functionView.setOnFunctionViewItemClickListener(new FunctionView.onFunctionViewItemClickListener() {
+            @Override
+            public void hint() {
+                Intent intent = new Intent(MainActivity.this, HintActivity.class);
+                startActivity(intent);
+            }
+
+            @Override
+            public void choose() {
+                Intent intent = new Intent(MainActivity.this, PhotoFrameActivity.class);
+                startActivityForResult(intent, PHOTO);
+                Toast.makeText(MainActivity.this, "选择！", Toast.LENGTH_SHORT).show();
+            }
+
+            @Override
+            public void down() {
+                downCurrentActivityBrightnessValues();
+            }
+
+            @Override
+            public void up() {
+                upCurrentActivityBrightnessValues();
+            }
+        });
+        pictureView.setOnTouchListener(this);
+        drawView.setOnCaYiCaCompleteListener(new DrawView.OnCaYiCaCompleteListener() {
+            @Override
+            public void complete() {
+                showView();
+                mAudioRecordManager.getNoiseLevel();
+                drawView.setVisibility(View.GONE);
+            }
+        });
     }
 
     private void initViews() {
@@ -118,6 +187,21 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         minus = findViewById(R.id.minus);
         bottom = findViewById(R.id.bottom_bar);
         drawView = findViewById(R.id.draw_glasses);
+    }
+
+    private void getCameraAndParams() {
+        camera = CameraManager.getCamera(this);
+        getCameraParams();
+    }
+
+    private void getCameraParams() {
+        final Camera.Parameters parameters = camera.getParameters();
+        minFocus = parameters.getZoom();
+        maxFocus = parameters.getMaxZoom();
+        everyFocus = 1;
+        nowFocus = minFocus;
+        seekBar.setMax(maxFocus);
+        Log.e(TAG, "当前镜头距离： " + minFocus + "\t\t获得最大距离: " + maxFocus);
     }
 
     /**
@@ -148,11 +232,6 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         }
     }
 
-    private void getCameraAndParams() {
-        camera = CameraManager.getCamera(this);
-        getCameraParams();
-    }
-
     @Override
     public void surfaceChanged(SurfaceHolder surfaceHolder, int i, int i1, int i2) {
         Log.e("surfaceChanged", "绘制改变");
@@ -172,13 +251,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     @Override
     public void surfaceDestroyed(SurfaceHolder surfaceHolder) {
         Log.e("surfaceDestroyed", "绘制结束");
-        toRelease();                                    //释放相机资源
-    }
-
-    /**
-     * 释放照相机的资源
-     */
-    private void toRelease() {
+        //释放相机资源
         if (camera != null) {
             camera.setPreviewCallback(null);                //停止相机视频，这个方法必须在前面，否则出错
             camera.stopPreview();                        //停止预览
@@ -242,32 +315,8 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         }
     }
 
-    public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-        //0~99  99级
-        Camera.Parameters parameters = camera.getParameters();    //获取相机参数
-        nowFocus = progress;                    //进度值赋值给焦距
-        parameters.setZoom(progress);                //设置焦距
-        camera.setParameters(parameters);                //设置相机
-    }
-
-    @Override
-    public void onStartTrackingTouch(SeekBar seekBar) {
-
-    }
-
-    @Override
-    public void onStopTrackingTouch(SeekBar seekBar) {
-
-    }
-
-
     @Override
     public void onClick(View view) {
-
-    }
-
-    @Override
-    public boolean onTouch(View view, MotionEvent motionEvent) {
         switch (view.getId()) {
             case R.id.add:
                 addZoomValues();
@@ -275,6 +324,14 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
             case R.id.minus:
                 minusZoomValues();
                 break;
+            default:
+                break;
+        }
+    }
+
+    @Override
+    public boolean onTouch(View view, MotionEvent motionEvent) {
+        switch (view.getId()) {
             case R.id.picture:
                 //待添加手势识别事件方法
                 break;
@@ -282,29 +339,6 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
                 break;
         }
         return true;
-    }
-
-    @Override
-    public void hint() {
-        Intent intent = new Intent(this, HintActivity.class);
-        startActivity(intent);
-    }
-
-    @Override
-    public void choose() {
-        Intent intent = new Intent(this, PhotoFrameActivity.class);
-        startActivityForResult(intent, PHOTO);
-        Toast.makeText(this, "选择！", Toast.LENGTH_SHORT).show();
-    }
-
-    @Override
-    public void down() {
-        downCurrentActivityBrightnessValues();
-    }
-
-    @Override
-    public void up() {
-        upCurrentActivityBrightnessValues();
     }
 
     @Override
@@ -360,4 +394,42 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         getAfterMySetBrightnessValues();            //获取设置后的屏幕亮度
     }
 
+    private void hideView() {
+        bottom.setVisibility(View.INVISIBLE);            //底部焦距缩放不可见
+        functionView.setVisibility(View.GONE);            //顶部亮度、帮助、选择镜框不可见
+    }
+
+    private void showView() {
+        pictureView.setImageBitmap(null);                //设置图片为null
+        bottom.setVisibility(View.VISIBLE);            //底部焦距缩放可见
+        functionView.setVisibility(View.VISIBLE);        //顶部亮度、帮助、选择镜框可见
+    }
+
+    private void getSoundValues(double values) {
+        //话筒分贝大于50，屏幕起雾
+        if (values > 50) {
+            hideView();
+            drawView.setVisibility(View.VISIBLE);
+            //设置补间动画
+            Animation animation = AnimationUtils.loadAnimation(this, R.anim.in_window);
+            drawView.setAnimation(animation);
+            mAudioRecordManager.isGetVoiceRun = false; //停止话筒录音
+            Log.e("玻璃显示", "执行");
+        }
+    }
+
+    private Handler mHandler = new Handler(new Handler.Callback() {
+        @Override
+        public boolean handleMessage(Message message) {
+            switch (message.what) {
+                case RECORD:                     //检测话筒
+                    double soundValues = (double) message.obj;
+                    getSoundValues(soundValues);    //获得话筒声音后，屏幕重绘起雾
+                    break;
+                default:
+                    break;
+            }
+            return false;
+        }
+    });
 }
